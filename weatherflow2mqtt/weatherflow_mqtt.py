@@ -289,6 +289,8 @@ class WeatherFlowMqtt:
         payload["unique_id"] = f"{serial_number}-{sensor.id}"
         if (units := sensor.unit_i if self.is_imperial else sensor.unit_m) is not None:
             payload["unit_of_measurement"] = units
+        if isinstance(sensor, SensorDescription) and (decimals := sensor.decimals[1 if self.is_imperial else 0]) is not None:
+            payload["suggested_display_precision"] = decimals
         if (device_class := sensor.device_class) is not None:
             payload["device_class"] = device_class
         if (state_class := sensor.state_class) is not None:
@@ -413,14 +415,6 @@ class WeatherFlowMqtt:
 
                         # Set the attribute to the Quantity's magnitude
                         attr = attr.m
-
-                    # Check if rounding is needed
-                    if (
-                        attr is not None
-                        and (decimals := sensor.decimals[1 if self.is_imperial else 0])
-                        is not None
-                    ):
-                        attr = round(attr, decimals)
 
                 elif isinstance(sensor, SqlSensorDescription):
                     attr = sensor.sql_fn(self.sql)
