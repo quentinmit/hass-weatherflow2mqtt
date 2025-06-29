@@ -404,7 +404,7 @@ class WeatherFlowMqtt:
                             ) = attr
 
                     # Check if the attr is a Quantity object
-                    elif isinstance(attr, Quantity):
+                    if isinstance(attr, Quantity):
                         # See if conversion is needed
                         if (
                             unit := sensor.imperial_unit

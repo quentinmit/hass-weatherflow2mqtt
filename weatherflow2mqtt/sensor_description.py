@@ -140,8 +140,9 @@ DEVICE_SENSORS: tuple[BaseSensorDescription, ...] = (
         custom_fn=lambda cnv, device: None
         if None in (device.air_temperature, device.relative_humidity)
         else cnv.absolute_humidity(
-            device.air_temperature.m, device.relative_humidity.m
+            device.air_temperature, device.relative_humidity,
         ),
+        decimals=(2, 2),
     ),
     SensorDescription(
         id="air_density",

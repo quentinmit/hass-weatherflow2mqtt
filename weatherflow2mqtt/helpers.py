@@ -9,6 +9,8 @@ import logging
 import math
 from typing import Any
 
+from pint import Quantity
+from pyweatherflowudp.const import units
 import yaml
 
 from .const import (
@@ -195,37 +197,49 @@ class ConversionFunctions:
             "FUNC: dewpoint ERROR: Temperature and/or Humidity value was reported as NoneType. Check the sensor"
         )
 
-    def absolute_humidity(self, temp, humidity):
+    def absolute_humidity(self, temp, relative_humidity):
         """ Return Absolute Humidity.
         Grams of water per cubic meter of air (g/m^3)
-        Input:
-            Temperature in Celcius
-            Relative Humidity in percent
-        AH = (1320.65/TK)*RH*(10**((7.4475*(TK-273.14))/(TK-39.44))
-            where:
-              AH is Absolute Humidity g/m^3
+        AH = RH*Ps/(Rw*T)
+            where
+              AH is Absolute Humidity
               RH is Relative Humidity in range of 0.0 - 1.0.  i.e. 25% RH is 0.25
-              TK is Temperature in Kelvin
+              T is Temperature
+        Ps = Pc*exp(Tc/T*(a1*τ+a2*τ^1.5+a3*τ^3+a4*τ^3.5+a5*τ^4+a6*τ^7.5))
+            where
+              Pc = 22.064 MPa
+              Tc = 647.096 K
+              a1, ... = -7.85951783
+                        1.84408259
+                        -11.7866497
+                        22.6807411
+                        -15.9618719
+                        1.80122502
+              τ = 1 - (T/Tc)
+
+        W. Wagner, A. Pruß; The IAPWS Formulation 1995 for the Thermodynamic Properties of Ordinary Water Substance for General and Scientific Use. J. Phys. Chem. Ref. Data 1 June 2002; 31 (2): 387–535. https://doi.org/10.1063/1.1461892
         """
-        if temp is None or humidity is None:
+        if temp is None or relative_humidity is None:
             return None
 
-        # Convert Celcius to Kelvin for temperature
-        TK = temp + 273.16
-        # Format Relative Humidity
-        RH = humidity / 100
-        # Absolute Humidity Estimation is fairly acurate between (5C - 20C) (41F - 122F)
-        AH = (1320.65 / TK) * RH * (10 ** ((7.4475 * (TK - 273.14)) / (TK - 39.44)))
+        T = temp.to('K')
+        Pc = 22.064*units.MPa
+        Tc = 647.096*units.K
+        tau = 1 - (T/Tc)
+        Ps = Pc * math.exp(
+            Tc/T*(
+                -7.85951783 * tau +
+                1.84408259 * (tau ** 1.5) +
+                -11.7866497 * (tau ** 3) +
+                22.6807411 * (tau ** 3.5) +
+                -15.9618719 * (tau ** 4) +
+                1.80122502 * (tau ** 7.5)
+            )
+        )
 
-        """
-        # lf/ft^3 is too small a value for that unit, will pass metric units
-        # just like Solar Radiation
-        # Leaving conversion here for future reference
-        if self._unit_system == UNITS_IMPERIAL:
-            # (g/m^3 * 0.000062) converts to lb/ft^3
-            return round(AH * 0.000062, 6)
-        """
-        return round(AH, 2)
+        Rw = 461.5*units("J/(kg K)")
+
+        return (relative_humidity * Ps / (Rw * T)).to("g / m^3")
 
     def rain_intensity(self, rain_rate) -> str:
         """ Return a descriptive value of the rain rate.
