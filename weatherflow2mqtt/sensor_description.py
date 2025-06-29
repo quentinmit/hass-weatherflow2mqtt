@@ -259,7 +259,7 @@ DEVICE_SENSORS: tuple[BaseSensorDescription, ...] = (
         attr="dew_point_temperature",
         custom_fn=lambda cnv, device: None
         if device.dew_point_temperature is None
-        else cnv.dewpoint_level(device.dew_point_temperature.m, True),
+        else cnv.dewpoint_level(device.dew_point_temperature),
     ),
     SensorDescription(
         id="feelslike",
@@ -519,7 +519,7 @@ DEVICE_SENSORS: tuple[BaseSensorDescription, ...] = (
         attr="air_temperature",
         custom_fn=lambda cnv, device: None
         if device.air_temperature is None
-        else cnv.temperature_level(device.air_temperature.m),
+        else cnv.temperature_level(device.air_temperature),
     ),
     SensorDescription(
         id="uv",

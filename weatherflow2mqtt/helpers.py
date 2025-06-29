@@ -567,7 +567,7 @@ class ConversionFunctions:
 
         return bft_value, bft_text
 
-    def dewpoint_level(self, dewpoint: float, is_metric: bool = None) -> str:
+    def dewpoint_level(self, dewpoint: Quantity[float]) -> str:
         """ Return text based comfort level.
         Input:
             dewpoint in Celsius or Fahrenheit
@@ -576,67 +576,57 @@ class ConversionFunctions:
         """
         if dewpoint is None:
             return "no-data"
-        if is_metric is None:
-            is_metric = self.unit_system != UNITS_IMPERIAL
 
-        if is_metric:
-            dewpoint = (dewpoint * 9 / 5) + 32
-
-        if dewpoint >= 80:
+        if dewpoint >= 80*units.degF:
             return self.translations["dewpoint"]["severely-high"]
-        if dewpoint >= 75:
+        if dewpoint >= 75*units.degF:
             return self.translations["dewpoint"]["miserable"]
-        if dewpoint >= 70:
+        if dewpoint >= 70*units.degF:
             return self.translations["dewpoint"]["oppressive"]
-        if dewpoint >= 65:
+        if dewpoint >= 65*units.degF:
             return self.translations["dewpoint"]["uncomfortable"]
-        if dewpoint >= 60:
+        if dewpoint >= 60*units.degF:
             return self.translations["dewpoint"]["ok-for-most"]
-        if dewpoint >= 55:
+        if dewpoint >= 55*units.degF:
             return self.translations["dewpoint"]["comfortable"]
-        if dewpoint >= 50:
+        if dewpoint >= 50*units.degF:
             return self.translations["dewpoint"]["very-comfortable"]
-        if dewpoint >= 30:
+        if dewpoint >= 30*units.degF:
             return self.translations["dewpoint"]["somewhat-dry"]
-        if dewpoint >= 0.5:
+        if dewpoint >= 0.5*units.degF:
             return self.translations["dewpoint"]["dry"]
-        if dewpoint >= 0:
+        if dewpoint >= 0*units.degF:
             return self.translations["dewpoint"]["very-dry"]
 
         return self.translations["dewpoint"]["undefined"]
 
-    def temperature_level(self, temperature_c):
+    def temperature_level(self, temperature):
         """ Return text based comfort level, based on Air Temperature value.
         Input:
-            Air Temperature in Celsius
-        Where:
-            temperature_c is input temperature in Celsius
-            temperature is temperature converted to Fahrenheit
+            Air Temperature
         """
-        if temperature_c is None:
+        if temperature is None:
             return "no-data"
 
-        temperature = (temperature_c * 9 / 5) + 32
-
-        if temperature >= 104:
+        if temperature >= 104*units.degF:
             return self.translations["temperature"]["inferno"]
-        if temperature >= 95:
+        if temperature >= 95*units.degF:
             return self.translations["temperature"]["very-hot"]
-        if temperature >= 86:
+        if temperature >= 86*units.degF:
             return self.translations["temperature"]["hot"]
-        if temperature >= 77:
+        if temperature >= 77*units.degF:
             return self.translations["temperature"]["warm"]
-        if temperature >= 68:
+        if temperature >= 68*units.degF:
             return self.translations["temperature"]["nice"]
-        if temperature >= 59:
+        if temperature >= 59*units.degF:
             return self.translations["temperature"]["cool"]
-        if temperature >= 41:
+        if temperature >= 41*units.degF:
             return self.translations["temperature"]["chilly"]
-        if temperature >= 32:
+        if temperature >= 32*units.degF:
             return self.translations["temperature"]["cold"]
-        if temperature >= 20:
+        if temperature >= 20*units.degF:
             return self.translations["temperature"]["freezing"]
-        if temperature <= 20:
+        if temperature <= 20*units.degF:
             return self.translations["temperature"]["fridged"]
 
         return self.translations["temperature"]["undefined"]
