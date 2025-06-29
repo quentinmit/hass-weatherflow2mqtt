@@ -199,7 +199,7 @@ DEVICE_SENSORS: tuple[BaseSensorDescription, ...] = (
         has_description=True,
         custom_fn=lambda cnv, device: (None, None)
         if None in (device.battery, device.solar_radiation)
-        else cnv.battery_mode(device.battery.m, device.solar_radiation.m),
+        else cnv.battery_mode(device.battery, device.solar_radiation),
     ),
     SensorDescription(
         id="beaufort",
@@ -210,7 +210,7 @@ DEVICE_SENSORS: tuple[BaseSensorDescription, ...] = (
         attr="wind_speed",
         custom_fn=lambda cnv, device: (None, None)
         if device.wind_speed is None
-        else cnv.beaufort(device.wind_speed.m),
+        else cnv.beaufort(device.wind_speed),
         has_description=True,
     ),
     SensorDescription(

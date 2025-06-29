@@ -487,13 +487,15 @@ class ConversionFunctions:
         if voltage is None or solar_radiation is None:
             return None
 
+        voltage = voltage.to(units.V).m
+
         if voltage >= 2.455:
             # Mode 0 (independent of charging or discharging at this voltage)
             batt_mode = int(0)
         elif voltage <= 2.355:
             # Mode 3 (independent of charging or discharging at this voltage)
             batt_mode = int(3)
-        elif solar_radiation > 100:
+        elif solar_radiation > 100*units("W/m^2"):
             # Assume charging and voltage is raising
             if voltage >= 2.41:
                 # Mode 1
@@ -531,6 +533,8 @@ class ConversionFunctions:
         """
         if wind_speed is None:
             return 0, self.translations["beaufort"][str(0)]
+
+        wind_speed = wind_speed.to('m/s').m
 
         if wind_speed > 32.7:
             bft_value = 12
