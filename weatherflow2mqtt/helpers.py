@@ -434,7 +434,7 @@ class ConversionFunctions:
             return self.temperature(wbgt)
         return wbgt
 
-    def battery_level(self, battery, is_tempest):
+    def battery_level(self, voltage, is_tempest):
         """ Return battery percentage.
         Input:
             Voltage in Volts DC (depends on the weather station type, see below)
@@ -457,33 +457,21 @@ class ConversionFunctions:
                 > 3.5 is capped at 100%
                 < 2.4 is capped at 0%
         """
-        if battery is None:
+        if voltage is None:
             return None
 
-        if is_tempest:
-            if battery > 2.80:
-                # Cap max at 100%
-                pb = int(100)
-            elif battery < 2.11:
-                # Min voltage is 1.8, but functional voltage is 2.11
-                pb = int(0)
-            else:
-                # pb = battery - 1.8
-                # Multiply by 100 to get in percentage
-                pb = int((battery - 2.11) / (2.8 - 2.11) * 100)
-        else:
-            if battery > 3.50:
-                # Cap max at 100%
-                pb = int(100)
-            elif battery < 2.4:
-                # Min voltage is 2.4
-                pb = int(0)
-            else:
-                # pb = (battery - 2.4)/1.1
-                # Multiply by 100 to get in percentage
-                pb = int(((battery - 2.4) / 1.1) * 100)
+        minv, maxv = (
+            # Min voltage is 1.8, but functional voltage is 2.11
+            (2.11, 2.8) if is_tempest
+            else (2.4, 3.5)
+        ) * units.V
 
-        return pb
+        if voltage > maxv:
+            return 1*units.percent
+        elif voltage < minv:
+            return 0*units.percent
+        else:
+            return ((voltage - minv) / (maxv - minv)).to(units.percent)
 
     def battery_mode(self, voltage, solar_radiation):
         """ Return battery operating mode.

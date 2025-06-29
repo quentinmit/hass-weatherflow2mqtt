@@ -187,7 +187,8 @@ DEVICE_SENSORS: tuple[BaseSensorDescription, ...] = (
         attr="battery",
         custom_fn=lambda cnv, device: None
         if device.battery is None
-        else cnv.battery_level(device.battery.m, isinstance(device, TempestDevice)),
+        else cnv.battery_level(device.battery, isinstance(device, TempestDevice)),
+        decimals=(0, 0),
     ),
     SensorDescription(
         id="battery_mode",
