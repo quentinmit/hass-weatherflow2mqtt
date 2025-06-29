@@ -467,7 +467,7 @@ class ConversionFunctions:
         ) * units.V
 
         if voltage > maxv:
-            return 1*units.percent
+            return 100*units.percent
         elif voltage < minv:
             return 0*units.percent
         else:
