@@ -319,71 +319,7 @@ class ConversionFunctions:
         # Visibility to horizon
         return mv * pr
 
-    def wetbulb(self, temp, humidity, pressure, no_conversion=False):
-        """ Return Wet Bulb Temperature.
-        Converted from a JS formula made by Gary W Funk
-        Input:
-            Temperature in Celcius
-            Humdity in Percent
-            Station Pressure in MB
-        Where:
-            t is air temperature
-            rh is relative humidity
-            p is staion pressure
-            edifference is 
-            twguess is
-            eguess is
-            eguess is
-            previoussign is 
-            cursign is 
-            incr is 
-            es is
-            e2 is
-        """
-        if temp is None or humidity is None or pressure is None:
-            return None
-
-        t = float(temp)
-        rh = float(humidity)
-        p = float(pressure)
-
-        # Variables
-        edifference = 1
-        twguess = 0
-        previoussign = 1
-        incr = 10
-        es = 6.112 * math.exp(17.67 * t / (t + 243.5))
-        e2 = es * (rh / 100)
-
-        while abs(edifference) > 0.005:
-            ewguess = 6.112 * math.exp((17.67 * twguess) / (twguess + 243.5))
-            eguess = ewguess - p * (t - twguess) * 0.00066 * (1 + (0.00115 * twguess))
-            edifference = e2 - eguess
-            if edifference == 0:
-                break
-
-            if edifference < 0:
-                cursign = -1
-                if cursign != previoussign:
-                    previoussign = cursign
-                    incr = incr / 10
-                else:
-                    incr = incr
-            else:
-                cursign = 1
-                if cursign != previoussign:
-                    previoussign = cursign
-                    incr = incr / 10
-                else:
-                    incr = incr
-
-            twguess = twguess + incr * previoussign
-
-        if no_conversion:
-            return twguess
-        return self.temperature(twguess)
-
-    def wbgt(self, temp, humidity, pressure, solar_radiation):
+    def wbgt(self, temp, wet_bulb_temp, humidity, pressure, solar_radiation):
         """ Return Wet Bulb Globe Temperature.
         This is a way to show heat stress on the human body.
         Input:
@@ -407,22 +343,21 @@ class ConversionFunctions:
         """
         if (
             temp is None
+            or wet_bulb_temp is None
             or humidity is None
             or pressure is None
             or solar_radiation is None
         ):
             return None
 
-        ta = float(temp)
-        twb = self.wetbulb(temp, humidity, pressure, True)
-        rh = float(humidity)
-        # p = float(pressure)
-        sr = float(solar_radiation)
+        wbgt = units.degC * (
+            0.7 * wet_bulb_temp.to(units.degC).m
+            + 0.002996 * solar_radiation.to("W / m^2").m
+            + 0.3368 * temp.to(units.degC).m
+            - 0.01578 * humidity.to("percent").m
+            -0.5478
+        )
 
-        wbgt = round(0.7 * twb + 0.002996 * sr + 0.3368 * ta - 0.01578 * rh - 0.5478, 1)
-
-        if self.unit_system == UNITS_IMPERIAL:
-            return self.temperature(wbgt)
         return wbgt
 
     def battery_level(self, voltage, is_tempest):
@@ -688,25 +623,26 @@ class ConversionFunctions:
         cos = math.cos
         sin = math.sin
         asin = math.asin
-        radians = math.radians
-        degrees = math.degrees
-        jd = time.localtime(time.time()).tm_yday
-        hr = time.localtime(time.time()).tm_hour
-        min = time.localtime(time.time()).tm_min
-        lt = hr + min/60
-        tz = time.localtime(time.time()).tm_gmtoff/3600
-        jd = jd + lt/24
-        beta = (360/365) * (jd - 81)
-        lstm = 15 * tz
-        eot = (9.87*(sin(radians(beta*2)))) - (7.53*(cos(radians(beta)))) - (1.5*(sin(radians(beta))))
-        tc = (4 * (longitude - lstm)) + eot
-        lst = lt + tc/60
-        h = 15 * (lst - 12)
-        dec = cos(radians(((jd) + 10) * (360/365))) * (-23.44)
-        se = degrees(asin(sin(radians(latitude)) * sin(radians(dec)) + cos(radians(latitude)) * cos(radians(dec)) * cos(radians(h))))
-        se = round(se)
+        latitude *= units.degree
+        longitude *= units.degree
+        tm = time.localtime(time.time())
+        jd = tm.tm_yday * units.day
+        lt = tm.tm_hour * units.hour + tm.tm_min * units.min
+        tz = tm.tm_gmtoff * units.second
+        jd = jd + lt
+        beta = (360 * units.degree) / (365 * units.day) * (jd - (81 * units.day))
+        lstm = 15 * units.degree / units.hour * tz
+        # https://susdesign.com/popups/sunangle/eot.php
+        eot = ((9.87*(sin(beta*2))) - (7.53*(cos(beta))) - (1.5*(sin(beta)))) * units.minute
+        tc = (4 * units.minute / units.degree * (longitude - lstm)) + eot
+        lst = lt + tc
+        h = 15 * units.degree/units.hour * (lst - 12*units.hour)
+        # https://www.pveducation.org/pvcdrom/properties-of-sunlight/declination-angle
+        dec = cos((jd + (10 * units.day)) * (360 * units.degree) / (365 * units.day)) * (-23.44 * units.degree)
+        # https://www.pveducation.org/pvcdrom/properties-of-sunlight/elevation-angle
+        se = asin(sin(latitude) * sin(dec) + cos(latitude) * cos(dec) * cos(h)) * units.radian
 
-        return se
+        return se.to(units.degree)
 
     def solar_insolation(self, elevation, latitude, longitude):
         """ Return Estimation of Solar Radiation at current sun elevation angle.
@@ -717,7 +653,7 @@ class ConversionFunctions:
         Where:
             solar_elevation is the Sun Elevation in Degrees with respect to the Horizon
             sz is Solar Zenith in Degrees
-            ah is (Station Elevation Compensation) Constant ah_a = 0.14, ah_h = Station elevation in km
+            ah is Station Elevation Compensation
             am is Air Mass of atmoshere between Station and Sun
             1353 W/M^2 is considered Solar Radiation at edge of atmoshere
             ** All Trigonometry Fuctions need Degrees converted to Radians **
@@ -731,22 +667,18 @@ class ConversionFunctions:
         cos = math.cos
         sin = math.sin
         asin = math.asin
-        radians = math.radians
-        degrees = math.degrees
         se = solar_elevation
-        sz = 90 - se
-        ah_a = 0.14
-        ah_h = elevation / (1000*units.m)
-        ah = ah_a * ah_h
+        sz = 90*units.degree - se
+        ah = (0.14 / units.km) * elevation
         if se >= 0:
-            am = 1/(cos(radians(sz)) + 0.50572*pow((96.07995 - sz),(-1.6364)))
-            si = (1353 * ((1-ah)*pow(.7, pow(am, 0.678))+ah))*(sin(radians(se)))
+            # https://www.e-education.psu.edu/eme810/node/533
+            am = 1/(cos(sz) + 0.50572*pow((96.07995*units.degree - sz)/units.degree,(-1.6364)))
+            si = (1353 * ((1-ah)*pow(.7, pow(am, 0.678))+ah))*(sin(se))
         else:
             am = 1
             si = 0
-        si = round(si)
 
-        return si
+        return si * units("W/m^2")
 
     def zambretti_value(self, latitude, wind_dir, p_hi, p_lo, trend, press):
         """ Return local forecast number based on Zambretti Forecaster.

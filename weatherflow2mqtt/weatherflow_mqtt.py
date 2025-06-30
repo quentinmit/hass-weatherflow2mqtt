@@ -323,7 +323,7 @@ class WeatherFlowMqtt:
 
         # Set some class level variables to help with sensors that may not have all data points available
         if (val := getattr(device, "solar_radiation", None)) is not None:
-            self.solar_radiation = val.m
+            self.solar_radiation = val
         if (
             val := getattr(device, "rain_accumulation_previous_minute", None)
         ) is not None:

@@ -554,6 +554,7 @@ DEVICE_SENSORS: tuple[BaseSensorDescription, ...] = (
         else cnv.visibility(
             elevation, device.air_temperature, device.dew_point_temperature
         ),
+        decimals=(1,1),
     ),
     SensorDescription(
         id="wbgt",
@@ -567,11 +568,12 @@ DEVICE_SENSORS: tuple[BaseSensorDescription, ...] = (
         decimals=(1, 1),
         custom_fn=lambda cnv, device, solar_radiation: None
         if None
-        in (device.air_temperature, device.relative_humidity, device.station_pressure)
+        in (device.air_temperature, device.wet_bulb_temperature, device.relative_humidity, device.station_pressure)
         else cnv.wbgt(
-            device.air_temperature.m,
-            device.relative_humidity.m,
-            device.station_pressure.m,
+            device.air_temperature,
+            device.wet_bulb_temperature,
+            device.relative_humidity,
+            device.station_pressure,
             solar_radiation,
         ),
     ),
@@ -681,7 +683,8 @@ DEVICE_SENSORS: tuple[BaseSensorDescription, ...] = (
         attr="solar_radiation",
         custom_fn=lambda cnv, latitude, longitude: None
         if None in (latitude, longitude)
-        else cnv.solar_elevation(latitude, longitude)
+        else cnv.solar_elevation(latitude, longitude),
+        decimals=(0, 0),
     ),
     SensorDescription(
         id="solar_insolation",
@@ -694,7 +697,8 @@ DEVICE_SENSORS: tuple[BaseSensorDescription, ...] = (
         attr="solar_radiation",
         custom_fn=lambda cnv, elevation, latitude, longitude: None
         if None in (elevation, latitude, longitude)
-        else cnv.solar_insolation(elevation, latitude, longitude)
+        else cnv.solar_insolation(elevation, latitude, longitude),
+        decimals=(0, 0),
     ),
     SensorDescription(
         id="zambretti_number",
