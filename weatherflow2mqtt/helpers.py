@@ -281,12 +281,12 @@ class ConversionFunctions:
         feelslike_c = temperature + 0.348 * e_value - 0.7 * windspeed - 4.25
         return self.temperature(feelslike_c)
 
-    def visibility(self, elevation, temp, humidity):
+    def visibility(self, elevation, temp, dewpoint):
         """ Return the visibility.
         Input:
-            Elevation in Meters
-            Temperature in Celcius
-            Humidity in percent
+            Elevation
+            Temperature
+            Dewpoint
         Where:
             elv_min is the station elevation with a minimum set height of 2 meters above sea level
             mv is the maximum distance of visibility to the horizon
@@ -294,39 +294,30 @@ class ConversionFunctions:
             pr is a precentage reduction of visability based on environmental conditions
             vis is the visability distance
         """
-        if temp is None or elevation is None or humidity is None:
+        if temp is None or elevation is None or dewpoint is None:
             return None
 
-        dewpoint_c = self.dewpoint(temp, humidity, True)
         # Set minimum elevation for cases of stations below sea level
-        if elevation > 2:
-            elv_min = float(elevation)
-        else:
-            elv_min = float(2)
+        elv_min = max(2*units.m, elevation)
 
-        # Max possible visibility to horizon (units km)
-        mv = float(3.56972 * math.sqrt(elv_min))
+        # Max possible visibility to horizon
+        # https://sites.math.washington.edu//~conroy/m120-general/horizon.pdf
+        mv = 3.56972 * units("km/m^.5") * elv_min**0.5
 
-        # Percent reduction based on quatity of water in air (no units)
+        # Percent reduction based on quantity of water in air (no units)
         # 76 percent of visibility variation can be accounted for by humidity accourding to US-NOAA.
-        pr_a = float((1.13 * abs(temp - dewpoint_c) - 1.15) / 10)
-        if pr_a > 1:
-            # Prevent visibility exceeding maximum distance
-            pr = float(1)
-        elif pr_a < 0.025:
-            # Prevent visibility below minimum distance
-            pr = float(0.025)
-        else:
-            pr = pr_a
+        # https://www.vos.noaa.gov/MWL/201504/visibility.shtml
+        water_visibility = 1.13 * units("mi / delta_degC") * abs(temp - dewpoint) - 1.15*units.mi
+        pr = max(
+            0.025,
+            min(
+                1,
+                water_visibility / (10*units.mi)
+            )
+        )
 
-        # Visibility in km to horizon
-        vis = float(mv * pr)
-
-        if self.unit_system == UNITS_IMPERIAL:
-            # Originally was in nautical miles;
-            # HA displays miles as imperial, therfore converted to miles
-            return round(vis / 1.609344, 1)
-        return round(vis, 1)
+        # Visibility to horizon
+        return mv * pr
 
     def wetbulb(self, temp, humidity, pressure, no_conversion=False):
         """ Return Wet Bulb Temperature.
@@ -720,7 +711,7 @@ class ConversionFunctions:
     def solar_insolation(self, elevation, latitude, longitude):
         """ Return Estimation of Solar Radiation at current sun elevation angle.
         Input:
-            Elevation in Meters
+            Elevation
             Latitude
             Longitude
         Where:
@@ -745,7 +736,7 @@ class ConversionFunctions:
         se = solar_elevation
         sz = 90 - se
         ah_a = 0.14
-        ah_h = elevation / 1000
+        ah_h = elevation / (1000*units.m)
         ah = ah_a * ah_h
         if se >= 0:
             am = 1/(cos(radians(sz)) + 0.50572*pow((96.07995 - sz),(-1.6364)))
@@ -1043,7 +1034,7 @@ class ConversionFunctions:
             Cloud Base (imperial or metric)
             Dew Point (metric)
             Wet Bulb (imperial or metric))
-            Station Height (metric)
+            Station Height
         Where:
             dptt is Dew Point plus Air Temperature
             snow_prob is the probability of snow
@@ -1068,7 +1059,7 @@ class ConversionFunctions:
             cloud_base = cloud_base / 3.28
             dew_point = dew_point
             wet_bulb = (wet_bulb - 32) / 1.8
-            station_height = station_height
+        station_height = station_height / units.m
         
         snow_line = freezing_level - 228.6 # 750 ft / 228.6 m, snow line can vary in distance from freezing line
         dptt = dew_point + air_temperature

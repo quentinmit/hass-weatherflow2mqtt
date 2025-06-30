@@ -110,7 +110,7 @@ class WeatherFlowMqtt:
 
     def __init__(
         self,
-        elevation: float = 0,
+        elevation: Quantity[float] = 0,
         latitude: float = 0,
         longitude: float = 0,
         unit_system: str = UNITS_METRIC,
@@ -360,7 +360,7 @@ class WeatherFlowMqtt:
                     if isinstance(attr, Callable):
                         inputs = {}
                         if "altitude" in sensor.inputs:
-                            inputs["altitude"] = self.elevation * UNIT_METERS
+                            inputs["altitude"] = self.elevation
                         attr = attr(**inputs)
 
                     # Check for a custom function
@@ -792,7 +792,7 @@ async def main():
     _LOGGER.info("Timezone is %s", os.environ.get("TZ"))
 
     # Read the config Settings
-    elevation = float(config.get("ELEVATION", 0))
+    elevation = float(config.get("ELEVATION", 0)) * UNIT_METERS
     latitude = float(config.get("LATITUDE", 0))
     longitude = float(config.get("LONGITUDE", 0))
     unit_system = config.get("UNIT_SYSTEM", UNITS_METRIC)

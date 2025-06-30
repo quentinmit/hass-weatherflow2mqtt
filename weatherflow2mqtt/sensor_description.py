@@ -550,9 +550,9 @@ DEVICE_SENSORS: tuple[BaseSensorDescription, ...] = (
         event=EVENT_OBSERVATION,
         attr="air_temperature",
         custom_fn=lambda cnv, device, elevation: None
-        if None in (device.air_temperature, device.relative_humidity)
+        if None in (device.air_temperature, device.dew_point_temperature)
         else cnv.visibility(
-            elevation, device.air_temperature.m, device.relative_humidity.m
+            elevation, device.air_temperature, device.dew_point_temperature
         ),
     ),
     SensorDescription(
