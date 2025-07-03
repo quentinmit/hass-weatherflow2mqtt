@@ -539,7 +539,7 @@ class WeatherFlowMqtt:
             data["wind_speed"] = self.cnv.speed(event.speed.m)
             data["wind_bearing"] = event.direction.m
             data["wind_direction"] = self.cnv.direction(event.direction.m)
-            self.wind_speed = event.speed.m
+            self.wind_speed = event.speed
             self._add_to_queue(state_topic, json.dumps(data))
             self.rapid_last_run = datetime.now().timestamp()
 

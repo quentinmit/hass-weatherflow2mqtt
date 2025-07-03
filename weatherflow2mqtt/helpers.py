@@ -173,30 +173,6 @@ class ConversionFunctions:
         direction_str = direction_array[int((value + 11.25) / 22.5)]
         return self.translations["wind_dir"][direction_str]
 
-    def dewpoint(self, temperature, humidity, no_conversion=False):
-        """ Return Dewpoint."""
-        if temperature is not None and humidity is not None:
-            dewpoint_c = round(
-                243.04
-                * (
-                    math.log(humidity / 100)
-                    + ((17.625 * temperature) / (243.04 + temperature))
-                )
-                / (
-                    17.625
-                    - math.log(humidity / 100)
-                    - ((17.625 * temperature) / (243.04 + temperature))
-                ),
-                1,
-            )
-            if no_conversion:
-                return dewpoint_c
-            return self.temperature(dewpoint_c)
-
-        _LOGGER.error(
-            "FUNC: dewpoint ERROR: Temperature and/or Humidity value was reported as NoneType. Check the sensor"
-        )
-
     def absolute_humidity(self, temp, relative_humidity):
         """ Return Absolute Humidity.
         Grams of water per cubic meter of air (g/m^3)
@@ -274,6 +250,8 @@ class ConversionFunctions:
         """ Calculate feel like temperature."""
         if temperature is None or humidity is None or windspeed is None:
             return 0
+
+        windspeed = windspeed.to(units.m/units.s).m
 
         e_value = (
             humidity * 0.06105 * math.exp((17.27 * temperature) / (237.7 + temperature))
@@ -910,10 +888,10 @@ class ConversionFunctions:
             # fog is more common at night
             fog = fog + 10
 
-        if wind_speed < 2.2352:
+        if wind_speed < 2.2352*units("m/s"):
             # fog is more likely when it is calm (<5 mph / 2.2352 m/s)
             fog = fog + 20
-        elif wind_speed < 4.4704:
+        elif wind_speed < 4.4704*units("m/s"):
             # it's more windy, fog is slightly less likely (<10 mph / 4.4704 m/s)
             fog = fog + 5
         else:
@@ -1081,9 +1059,9 @@ class ConversionFunctions:
             current = "snowy-rainy"
         elif (rain_rate >= 0.01): # any rain at all
             current = "rainy"
-        elif ((wind_speed >= 11.17) and (cloudy)): # windy => Imperial >= 25 mph, Metric >= 11.17 m/s
+        elif ((wind_speed >= 11.17*units("m/s") and (cloudy)): # windy => Imperial >= 25 mph, Metric >= 11.17 m/s
             current = "windy-variant"
-        elif (wind_speed >= 11.17): # windy => Imperial >= 25 mph, Metric >= 11.17 m/s
+        elif (wind_speed >= 11.17*units("m/s")): # windy => Imperial >= 25 mph, Metric >= 11.17 m/s
             current = "windy"
         elif (fog_prob >= 50):
             current = "fog"
