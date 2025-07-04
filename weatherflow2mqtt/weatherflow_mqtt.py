@@ -57,6 +57,7 @@ from .const import (
     UNITS_METRIC,
     ZAMBRETTI_MAX_PRESSURE,
     ZAMBRETTI_MIN_PRESSURE,
+    UnitSystem,
 )
 from .forecast import Forecast, ForecastConfig
 from .helpers import ConversionFunctions, read_config, truebool
@@ -113,7 +114,7 @@ class WeatherFlowMqtt:
         elevation: Quantity[float] = 0,
         latitude: float = 0,
         longitude: float = 0,
-        unit_system: str = UNITS_METRIC,
+        unit_system: UnitSystem = UNITS_METRIC,
         rapid_wind_interval: int = 0,
         language: str = LANGUAGE_ENGLISH,
         mqtt_config: MqttConfig = MqttConfig(),
@@ -289,7 +290,7 @@ class WeatherFlowMqtt:
         payload["unique_id"] = f"{serial_number}-{sensor.id}"
         if (units := sensor.unit_i if self.is_imperial else sensor.unit_m) is not None:
             payload["unit_of_measurement"] = units
-        if isinstance(sensor, SensorDescription) and (decimals := sensor.decimals[1 if self.is_imperial else 0]) is not None:
+        if (decimals := sensor.decimals[1 if self.is_imperial else 0]) is not None:
             payload["suggested_display_precision"] = decimals
         if (device_class := sensor.device_class) is not None:
             payload["device_class"] = device_class
@@ -522,7 +523,7 @@ class WeatherFlowMqtt:
         _LOGGER.debug("Lightning strike event from: %s", device)
         self.sql.writeLightning()
         self.storage["lightning_count_today"] += 1
-        self.storage["last_lightning_distance"] = self.cnv.distance(event.distance.m)
+        self.storage["last_lightning_distance"] = self.unit_system.distance.m_from(event.distance)
         self.storage["last_lightning_energy"] = event.energy
         self.storage["last_lightning_time"] = event.epoch
         self.sql.writeStorage(self.storage)
@@ -536,9 +537,9 @@ class WeatherFlowMqtt:
         )
         now = datetime.now().timestamp()
         if (now - self.rapid_last_run) >= self.rapid_wind_interval:
-            data["wind_speed"] = self.cnv.speed(event.speed.m)
+            data["wind_speed"] = self.unit_system.wind_speed.m_from(event.speed)
             data["wind_bearing"] = event.direction.m
-            data["wind_direction"] = self.cnv.direction(event.direction.m)
+            data["wind_direction"] = self.cnv.direction(event.direction)
             self.wind_speed = event.speed
             self._add_to_queue(state_topic, json.dumps(data))
             self.rapid_last_run = datetime.now().timestamp()

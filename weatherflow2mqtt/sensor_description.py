@@ -62,6 +62,7 @@ class BaseSensorDescription:
     unit_i_cnv: str | None = None
     unit_m: str | None = None
     unit_m_cnv: str | None = None
+    decimals: tuple[int | None, int | None] = (None, None)
 
     @property
     def device_attr(self) -> str:
@@ -94,7 +95,6 @@ class SensorDescription(BaseSensorDescription):
     custom_fn: Callable[[ConversionFunctions, WeatherFlowDevice], Any] | Callable[
         [ConversionFunctions, WeatherFlowDevice, Any | None], Any
     ] | None = None
-    decimals: tuple[int | None, int | None] = (None, None)
     inputs: tuple[str, ...] = field(default_factory=tuple[str, ...])
 
 
@@ -344,6 +344,7 @@ DEVICE_SENSORS: tuple[BaseSensorDescription, ...] = (
         event=EVENT_OBSERVATION,
         attr="lightning_strike_average_distance",
         storage_field="last_lightning_distance",
+        decimals=(0, 2),
     ),
     StorageSensorDescription(
         id="lightning_strike_energy",
@@ -451,6 +452,7 @@ DEVICE_SENSORS: tuple[BaseSensorDescription, ...] = (
         attr="rain_accumulation_previous_minute",
         storage_field="rain_today",
         cnv_fn=lambda _, val: val*UNITS_METRIC.rain,
+        decimals=(2, 2),
     ),
     StorageSensorDescription(
         id="rain_yesterday",
@@ -463,6 +465,7 @@ DEVICE_SENSORS: tuple[BaseSensorDescription, ...] = (
         attr="rain_accumulation_previous_minute",
         storage_field="rain_yesterday",
         cnv_fn=lambda _, val: val*UNITS_METRIC.rain,
+        decimals=(2, 2),
     ),
     SensorDescription(
         id="relative_humidity",
@@ -623,7 +626,7 @@ DEVICE_SENSORS: tuple[BaseSensorDescription, ...] = (
         attr="wind_direction",
         custom_fn=lambda cnv, device: None
         if device.wind_direction is None
-        else cnv.direction(device.wind_direction.m),
+        else cnv.direction(device.wind_direction),
     ),
     SensorDescription(
         id="wind_gust",

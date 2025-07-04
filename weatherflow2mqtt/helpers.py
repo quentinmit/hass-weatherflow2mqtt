@@ -91,41 +91,6 @@ class ConversionFunctions:
             "FUNC: temperature ERROR: Temperature value was reported as NoneType. Check the sensor"
         )
 
-    def pressure(self, value) -> float:
-        """ Convert Pressure Value."""
-        if value is not None:
-            if self.unit_system == UNITS_IMPERIAL:
-                return round(value * 0.02953, 3)
-            return round(value, 2)
-
-        _LOGGER.error(
-            "FUNC: pressure ERROR: Pressure value was reported as NoneType. Check the sensor"
-        )
-
-    def speed(self, value, kmh=False) -> float:
-        """ Convert Wind Speed."""
-        if value is not None:
-            if self.unit_system == UNITS_IMPERIAL:
-                return round(value * 2.2369362920544, 2)
-            if kmh:
-                return round((value * 18 / 5), 1)
-            return round(value, 1)
-
-        _LOGGER.error(
-            "FUNC: speed ERROR: Wind value was reported as NoneType. Check the sensor"
-        )
-
-    def distance(self, value) -> float:
-        """ Convert distance."""
-        if value is not None:
-            if self.unit_system == UNITS_IMPERIAL:
-                return round(value / 1.609344, 2)
-            return value
-
-        _LOGGER.error(
-            "FUNC: distance ERROR: Lightning Distance value was reported as NoneType. Check the sensor"
-        )
-
     def rain_type(self, value) -> str:
         """ Convert rain type."""
         type_array = ["none", "rain", "hail", "heavy-rain"]
@@ -160,7 +125,7 @@ class ConversionFunctions:
             "NNW",
             "N",
         ]
-        direction_str = direction_array[int((value + 11.25) / 22.5)]
+        direction_str = direction_array[int((units.degrees.m_from(value) + 11.25) / 22.5) % 16]
         return self.translations["wind_dir"][direction_str]
 
     def absolute_humidity(self, temp, relative_humidity):
@@ -703,9 +668,8 @@ class ConversionFunctions:
         z_month = int(z_month.strftime("%m"))
         # True (1) for summer, False (0) for Winter (Northern Hemishere)
         z_season = (z_month >= 4 and  z_month <= 9)
-        # z_wind is English windrose cardinal eg. N, NNW, NW etc.
-        # NB. if calm a 'nonsense' value should be sent as z_wind (direction) eg. 1 or calm !
-        z_wind = self.direction(wind_dir)
+        # z_wind is windrose cardinal where 0 = N, 7 = S, 15 = NNW, etc.
+        z_wind = int((wind_dir + 11.25) / 22.5) % 16
         # z_trend is barometer trend: 0 = no change, 1 = rise, 2 = fall
         # z_trend_threshold = 0.047248 if self.unit_system == UNITS_IMPERIAL else 1.6
         if float(trend) < 0:
@@ -723,38 +687,24 @@ class ConversionFunctions:
 
         if z_where == 1:
             # North hemisphere
-            if z_wind == "N":
-                z_hpa += 6 / 100 * z_range
-            elif z_wind == "NNE":
-                z_hpa += 5 / 100 * z_range
-            elif z_wind == "NE":
-                z_hpa += 5 / 100 * z_range
-            elif z_wind == "ENE":
-                z_hpa += 2 / 100 * z_range
-            elif z_wind == "E":
-                z_hpa -= 0.5 / 100 * z_range
-            elif z_wind == "ESE":
-                z_hpa -= 2 / 100 * z_range
-            elif z_wind == "SE":
-                z_hpa -= 5 / 100 * z_range
-            elif z_wind == "SSE":
-                z_hpa -= 8.5 / 100 * z_range
-            elif z_wind == "S":
-                z_hpa -= 12 / 100 * z_range
-            elif z_wind == "SSW":
-                z_hpa -= 10 / 100 * z_range
-            elif z_wind == "SW":
-                z_hpa -= 6 / 100 * z_range
-            elif z_wind == "WSW":
-                z_hpa -= 4.5 / 100 * z_range
-            elif z_wind == "W":
-                z_hpa -= 3 / 100 * z_range
-            elif z_wind == "WNW":
-                z_hpa -= 0.5 / 100 * z_range
-            elif z_wind == "NW":
-                z_hpa += 1.5 / 100 * z_range
-            elif z_wind == "NNW":
-                z_hpa += 3 / 100 * z_range
+            z_hpa += [
+                +6, # N
+                +5, # NNE
+                +5, # NE
+                +2, # ENE
+                -0.5, # E
+                -2, # ESE
+                -5, # SE
+                -8.5, # SSE
+                -12, # S
+                -10, # SSW
+                -6, # SW
+                -4.5, # WSW
+                -3, # W
+                -0.5, # WNW
+                +1.5, # NW
+                +3, # NNW
+            ][z_wind] / 100 * z_range
             if z_season == 1:
                 # if Summer
                 if z_trend == 1:
@@ -765,38 +715,24 @@ class ConversionFunctions:
                     z_hpa -= 7 / 100 * z_range
         else:
             # South hemisphere
-            if z_wind == "S":
-                z_hpa += 6 / 100 * z_range
-            elif z_wind == "SSW":
-                z_hpa += 5 / 100 * z_range
-            elif z_wind == "SW":
-                z_hpa += 5 / 100 * z_range
-            elif z_wind == "WSW":
-                z_hpa += 2 / 100 * z_range
-            elif z_wind == "W":
-                z_hpa -= 0.5 / 100 * z_range
-            elif z_wind == "WNW":
-                z_hpa -= 2 / 100 * z_range
-            elif z_wind == "NW":
-                z_hpa -= 5 / 100 * z_range
-            elif z_wind == "NNW":
-                z_hpa -= 8.5 / 100 * z_range
-            elif z_wind == "N":
-                z_hpa -= 12 / 100 * z_range
-            elif z_wind == "NNE":
-                z_hpa -= 10 / 100 * z_range
-            elif z_wind == "NE":
-                z_hpa -= 6 / 100 * z_range
-            elif z_wind == "ENE":
-                z_hpa -= 4.5 / 100 * z_range
-            elif z_wind == "E":
-                z_hpa -= 3 / 100 * z_range
-            elif z_wind == "ESE":
-                z_hpa -= 0.5 / 100 * z_range
-            elif z_wind == "SE":
-                z_hpa += 1.5 / 100 * z_range
-            elif z_wind == "SSE":
-                z_hpa += 3 / 100 * z_range
+            z_hpa += [
+                -12, # N
+                -10, # NNE
+                -6, # NE
+                -4.5, # ENE
+                -3, # E
+                -0.5, # ESE
+                +1.5, # SE
+                +3, # SSE
+                +6, # S
+                +5, # SSW
+                +5, # SW
+                +2, # WSW
+                -0.5, # W
+                -2, # WNW
+                -5, # NW
+                -8.5, # NNW
+            ][z_wind] / 100 * z_range
             if z_season == 0:
                 # Winter
                 if z_trend == 1:
