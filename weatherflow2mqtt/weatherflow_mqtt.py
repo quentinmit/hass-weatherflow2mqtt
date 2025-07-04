@@ -262,6 +262,7 @@ class WeatherFlowMqtt:
                         EVENT_STRIKE,
                         lambda event: self._handle_strike_event(device, event),
                     )
+                    self._publish_strike_storage(device)
                 if isinstance(device, SkySensorType):
                     device.on(
                         EVENT_RAPID_WIND,
@@ -316,6 +317,14 @@ class WeatherFlowMqtt:
 
         return payload
 
+    def _publish_state(
+        self, device: HubDevice | WeatherFlowSensorDevice, evt: str, data
+    ) -> None:
+        state_topic = MQTT_TOPIC_FORMAT.format(
+            DEVICE_SERIAL_FORMAT.format(device.serial_number), evt, "state"
+        )
+        self._add_to_queue(state_topic, json.dumps(data))
+
     def _handle_observation_event(
         self, device: WeatherFlowSensorDevice, event: CustomEvent
     ) -> None:
@@ -338,7 +347,7 @@ class WeatherFlowMqtt:
         for sensor in DEVICE_SENSORS:
             # Skip if this device is missing the attribute
             if (
-                sensor.event in (EVENT_RAPID_WIND, EVENT_STATUS_UPDATE)
+                sensor.event in (EVENT_RAPID_WIND, EVENT_STRIKE, EVENT_STATUS_UPDATE)
                 or not hasattr(device, sensor.device_attr)
                 or (
                     sensor.id == "battery_mode"
@@ -452,10 +461,7 @@ class WeatherFlowMqtt:
 
         for (evt, data) in event_data.items():
             if data:
-                state_topic = MQTT_TOPIC_FORMAT.format(
-                    DEVICE_SERIAL_FORMAT.format(device.serial_number), evt, "state"
-                )
-                self._add_to_queue(state_topic, json.dumps(data))
+                self._publish_state(device, evt, data)
 
         self.sql.updateHighLow(event_data[EVENT_OBSERVATION])
         # self.sql.updateDayData(event_data[EVENT_OBSERVATION])
@@ -477,12 +483,9 @@ class WeatherFlowMqtt:
         _LOGGER.debug("Status update event from: %s", device)
         device_serial = DEVICE_SERIAL_FORMAT.format(device.serial_number)
 
-        state_topic = MQTT_TOPIC_FORMAT.format(
-            device_serial, EVENT_STATUS_UPDATE, "state"
-        )
         state_data = OrderedDict()
         state_data["status"] = device.up_since.isoformat()
-        self._add_to_queue(state_topic, json.dumps(state_data))
+        self._publish_state(device, EVENT_STATUS_UPDATE, state_data)
 
         attr_topic = MQTT_TOPIC_FORMAT.format(device_serial, "status", "attributes")
         attr_data = OrderedDict()
@@ -514,6 +517,17 @@ class WeatherFlowMqtt:
 
         self._add_to_queue(attr_topic, json.dumps(attr_data))
 
+    def _publish_strike_storage(
+        self, device: AirSensorType
+    ):
+        """Publish the strike info in storage."""
+        data = OrderedDict()
+        data["lightning_strike_distance"] = self.storage["last_lightning_distance"]
+        data["lightning_strike_energy"] = self.storage["last_lightning_energy"]
+        data["lightning_strike_time"] = self.storage["last_lightning_time"]
+        self._publish_state(device, EVENT_STRIKE, data)
+
+
     def _handle_strike_event(
         self, device: AirSensorType, event: LightningStrikeEvent
     ) -> None:
@@ -525,21 +539,19 @@ class WeatherFlowMqtt:
         self.storage["last_lightning_energy"] = event.energy
         self.storage["last_lightning_time"] = event.epoch
         self.sql.writeStorage(self.storage)
+        self._publish_strike_storage(device)
 
     def _handle_wind_event(self, device: SkySensorType, event: WindEvent) -> None:
         """Handle a wind event."""
         _LOGGER.debug("Wind event from: %s", device)
         data = OrderedDict()
-        state_topic = MQTT_TOPIC_FORMAT.format(
-            DEVICE_SERIAL_FORMAT.format(device.serial_number), EVENT_RAPID_WIND, "state"
-        )
         now = datetime.now().timestamp()
         if (now - self.rapid_last_run) >= self.rapid_wind_interval:
             data["wind_speed"] = self.unit_system.wind_speed.m_from(event.speed)
             data["wind_bearing"] = event.direction.m
             data["wind_direction"] = self.cnv.direction(event.direction)
             self.wind_speed = event.speed
-            self._add_to_queue(state_topic, json.dumps(data))
+            self._publish_state(device, EVENT_RAPID_WIND, data)
             self.rapid_last_run = datetime.now().timestamp()
 
     def _init_sql_db(self, database_file: str = None) -> None:
