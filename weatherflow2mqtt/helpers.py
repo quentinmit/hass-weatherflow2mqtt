@@ -18,6 +18,7 @@ from .const import (
     EXTERNAL_DIRECTORY,
     SUPPORTED_LANGUAGES,
     UNITS_IMPERIAL,
+    UnitSystem,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -58,7 +59,7 @@ def read_config() -> list[str] | None:
 class ConversionFunctions:
     """ Class to help with converting from different units."""
 
-    def __init__(self, unit_system: str, language: str) -> None:
+    def __init__(self, unit_system: UnitSystem, language: str) -> None:
         """Initialize Conversion Function."""
         self.unit_system = unit_system
         self.translations = self.get_language_file(language)
@@ -123,17 +124,6 @@ class ConversionFunctions:
 
         _LOGGER.error(
             "FUNC: distance ERROR: Lightning Distance value was reported as NoneType. Check the sensor"
-        )
-
-    def rain(self, value) -> float:
-        """ Convert rain."""
-        if value is not None:
-            if self.unit_system == UNITS_IMPERIAL:
-                return round(value * 0.0393700787, 2)
-            return round(value, 2)
-
-        _LOGGER.error(
-            "FUNC: rain ERROR: Rain value was reported as NoneType. Check the sensor"
         )
 
     def rain_type(self, value) -> str:
@@ -1059,7 +1049,7 @@ class ConversionFunctions:
             current = "snowy-rainy"
         elif (rain_rate >= 0.01): # any rain at all
             current = "rainy"
-        elif ((wind_speed >= 11.17*units("m/s") and (cloudy)): # windy => Imperial >= 25 mph, Metric >= 11.17 m/s
+        elif ((wind_speed >= 11.17*units("m/s")) and (cloudy)): # windy => Imperial >= 25 mph, Metric >= 11.17 m/s
             current = "windy-variant"
         elif (wind_speed >= 11.17*units("m/s")): # windy => Imperial >= 25 mph, Metric >= 11.17 m/s
             current = "windy"

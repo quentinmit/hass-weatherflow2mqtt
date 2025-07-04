@@ -1,6 +1,10 @@
 """Constant file for weatherflow2mqtt."""
+from abc import ABC, abstractmethod
 import datetime
 import os
+
+from pint.registry import Unit
+from pyweatherflowudp.const import units
 
 ATTRIBUTION = "Powered by WeatherFlow2MQTT"
 DOMAIN = "weatherflow2mqtt"
@@ -172,8 +176,47 @@ SUPPORTED_LANGUAGES = [
 
 TEMP_CELSIUS = "°C"
 TEMP_FAHRENHEIT = "°F"
-UNITS_IMPERIAL = "imperial"
-UNITS_METRIC = "metric"
+
+class UnitSystem(ABC):
+    temperature: Unit
+    wind_speed: Unit
+    rain: Unit
+    pressure: Unit
+    distance: Unit
+    brightness: Unit
+    solar_radiation: Unit
+    air_density: Unit
+
+    @abstractmethod
+    def __str__(self) -> str: pass
+
+class UnitsImperial(UnitSystem):
+    def __str__(self): return "imperial"
+    temperature = units.degF
+    wind_speed = units.mph
+    forecast_wind_speed = units.mph
+    rain = units.inch
+    pressure = units.inHg
+    distance = units.mi
+    brightness = units.lx
+    solar_radiation = units.parse_units("W/m²")
+    air_density = units.parse_units("lb/ft³")
+
+UNITS_IMPERIAL = UnitsImperial()
+
+class UnitsMetric(UnitSystem):
+    def __str__(self): return "metric"
+    temperature = units.degC
+    wind_speed = units.parse_units("m/s")
+    forecast_wind_speed = units.parse_units("kph")
+    rain = units.mm
+    pressure = units.hPa
+    distance = units.km
+    brightness = units.lx
+    solar_radiation = units.parse_units("W/m²")
+    air_density = units.parse_units("kg/m³")
+
+UNITS_METRIC = UnitsMetric()
 
 UTC = datetime.timezone.utc
 

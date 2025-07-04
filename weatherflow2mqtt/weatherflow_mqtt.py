@@ -140,7 +140,7 @@ class WeatherFlowMqtt:
         self.udp_config = udp_config
 
         self.forecast = (
-            Forecast.from_config(config=forecast_config, conversions=self.cnv)
+            Forecast.from_config(config=forecast_config, unit_system=self.unit_system, conversions=self.cnv)
             if forecast_config is not None
             else None
         )
@@ -403,19 +403,6 @@ class WeatherFlowMqtt:
                                 event_data[sensor.event][f"{sensor.id}_description"],
                             ) = attr
 
-                    # Check if the attr is a Quantity object
-                    if isinstance(attr, Quantity):
-                        # See if conversion is needed
-                        if (
-                            unit := sensor.imperial_unit
-                            if self.is_imperial
-                            else sensor.metric_unit
-                        ) is not None:
-                            attr = attr.to(unit)
-
-                        # Set the attribute to the Quantity's magnitude
-                        attr = attr.m
-
                 elif isinstance(sensor, SqlSensorDescription):
                     attr = sensor.sql_fn(self.sql)
 
@@ -424,6 +411,19 @@ class WeatherFlowMqtt:
 
                     if (fn := sensor.cnv_fn) is not None:
                         attr = fn(self.cnv, attr)
+
+                # Check if the attr is a Quantity object
+                if isinstance(attr, Quantity):
+                    # See if conversion is needed
+                    if (
+                        unit := sensor.imperial_unit
+                        if self.is_imperial
+                        else sensor.metric_unit
+                    ) is not None:
+                        attr = attr.to(unit)
+
+                    # Set the attribute to the Quantity's magnitude
+                    attr = attr.m
 
                 # Handle timestamp None value
                 if sensor.device_class == DEVICE_CLASS_TIMESTAMP and attr is None:
@@ -795,7 +795,7 @@ async def main():
     elevation = float(config.get("ELEVATION", 0)) * UNIT_METERS
     latitude = float(config.get("LATITUDE", 0))
     longitude = float(config.get("LONGITUDE", 0))
-    unit_system = config.get("UNIT_SYSTEM", UNITS_METRIC)
+    unit_system = UNITS_IMPERIAL if config.get("UNIT_SYSTEM") == str(UNITS_IMPERIAL) else UNITS_METRIC
     _LOGGER.info("Unit System is %s", unit_system)
     rw_interval = int(config.get("RAPID_WIND_INTERVAL", 0))
     language = config.get("LANGUAGE", LANGUAGE_ENGLISH).lower()
@@ -832,6 +832,7 @@ async def main():
 
     if truebool(config.get("DEBUG")):
         logging.getLogger().setLevel(logging.DEBUG)
+        logging.getLogger("numba").setLevel(logging.INFO)
 
     if isinstance(filter_sensors := config.get("FILTER_SENSORS"), str):
         filter_sensors = [sensor.strip() for sensor in filter_sensors.split(",")]

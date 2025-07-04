@@ -33,6 +33,7 @@ from .const import (
     STATE_CLASS_MEASUREMENT,
     TEMP_CELSIUS,
     TEMP_FAHRENHEIT,
+    UNITS_METRIC,
 )
 from .helpers import NO_CONVERSION, no_conversion_to_none
 
@@ -449,7 +450,7 @@ DEVICE_SENSORS: tuple[BaseSensorDescription, ...] = (
         last_reset=True,
         attr="rain_accumulation_previous_minute",
         storage_field="rain_today",
-        cnv_fn=lambda cnv, val: cnv.rain(val),
+        cnv_fn=lambda _, val: val*UNITS_METRIC.rain,
     ),
     StorageSensorDescription(
         id="rain_yesterday",
@@ -461,7 +462,7 @@ DEVICE_SENSORS: tuple[BaseSensorDescription, ...] = (
         event=EVENT_OBSERVATION,
         attr="rain_accumulation_previous_minute",
         storage_field="rain_yesterday",
-        cnv_fn=lambda cnv, val: cnv.rain(val),
+        cnv_fn=lambda _, val: val*UNITS_METRIC.rain,
     ),
     SensorDescription(
         id="relative_humidity",
@@ -759,6 +760,8 @@ DEVICE_SENSORS: tuple[BaseSensorDescription, ...] = (
         else cnv.current_conditions(lightning_strike_count_1hr, precipitation_type, rain_rate, wind_speed, solar_elevation, solar_radiation, solar_insolation, snow_probability, fog_probability)
     ),
 )
+
+DEVICE_SENSOR_BY_ID = {s.id: s for s in DEVICE_SENSORS}
 
 HUB_SENSORS: tuple[BaseSensorDescription, ...] = (STATUS_SENSOR,)
 

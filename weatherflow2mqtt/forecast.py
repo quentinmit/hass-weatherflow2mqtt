@@ -5,10 +5,12 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, OrderedDict
+from typing import Any, OrderedDict, Optional
 
 from aiohttp import ClientSession, ClientTimeout
 from aiohttp.client_exceptions import ClientError
+from pint import Quantity
+from pyweatherflowudp.const import units
 
 from .const import (
     ATTR_ATTRIBUTION,
@@ -33,11 +35,27 @@ from .const import (
     FORECAST_TYPE_DAILY,
     FORECAST_TYPE_HOURLY,
     LANGUAGE_ENGLISH,
+    UNITS_IMPERIAL,
     UNITS_METRIC,
+    TEMP_CELSIUS,
+    TEMP_FAHRENHEIT,
+    UnitSystem,
 )
 from .helpers import ConversionFunctions
 
 _LOGGER = logging.getLogger(__name__)
+
+
+WEATHERFLOW_UNITS = {
+    "kg/m3": "kg/m3",
+    "lux": "lux",
+    "km": "km",
+    "mm": "mm",
+    "mb": "hPa",
+    "w/m2": "W/m^2",
+    "c": "degC",
+    "mps": "m/s",
+}
 
 
 @dataclass
@@ -56,6 +74,7 @@ class Forecast:
         self,
         station_id: str,
         token: str,
+        unit_system: UnitSystem = UNITS_METRIC,
         interval: int = 30,
         conversions: ConversionFunctions = ConversionFunctions(
             unit_system=UNITS_METRIC, language=LANGUAGE_ENGLISH
@@ -66,6 +85,7 @@ class Forecast:
         self.station_id = station_id
         self.token = token
         self.interval = interval
+        self.unit_system = unit_system
         self.conversions = conversions
         self._session: ClientSession = session
 
@@ -73,6 +93,7 @@ class Forecast:
     def from_config(
         cls,
         config: ForecastConfig,
+        unit_system: UnitSystem = UNITS_METRIC,
         conversions: ConversionFunctions = ConversionFunctions(
             unit_system=UNITS_METRIC, language=LANGUAGE_ENGLISH
         ),
@@ -84,6 +105,7 @@ class Forecast:
             token=config.token,
             interval=config.interval,
             conversions=conversions,
+            unit_system=unit_system,
             session=session,
         )
 
@@ -96,6 +118,30 @@ class Forecast:
         items = []
 
         if json_data is not None:
+            # Calculate the correct units
+            pint_units = {
+                key: units.parse_units(WEATHERFLOW_UNITS[value])
+                for key, value in json_data.get("units", {}).items()
+                if value in WEATHERFLOW_UNITS
+            }
+            forecast_field_units = {
+                "air_temp_high": pint_units["units_temp"],
+                "air_temp_low": pint_units["units_temp"],
+                "precip_probability": "%",
+                "air_temperature": pint_units["units_temp"],
+                "sea_level_pressure": pint_units["units_pressure"],
+                "relative_humidity": "%",
+                "precip": pint_units["units_precip"],
+                "wind_avg": pint_units["units_wind"],
+                "wind_direction": "°",
+                "wind_gust": pint_units["units_wind"],
+                "feels_like": pint_units["units_temp"],
+            }
+            def get(forecast, field, default=None):
+                if field not in forecast_field_units:
+                    return forecast.get(field, default)
+                return units.Quantity(forecast.get(field, default), forecast_field_units[field])
+
             # We need a few Items from the Current Conditions section
             current_cond = json_data.get("current_conditions")
             current_icon = current_cond["icon"]
@@ -109,18 +155,14 @@ class Forecast:
             forecast_data = json_data.get("forecast")
 
             # We also need Day hign and low Temp from Today
-            temp_high_today = self.conversions.temperature(
-                forecast_data[FORECAST_TYPE_DAILY][0]["air_temp_high"]
-            )
-            temp_low_today = self.conversions.temperature(
-                forecast_data[FORECAST_TYPE_DAILY][0]["air_temp_low"]
-            )
+            temp_high_today = get(forecast_data[FORECAST_TYPE_DAILY][0], "air_temp_high")
+            temp_low_today = get(forecast_data[FORECAST_TYPE_DAILY][0], "air_temp_low")
 
             # Process Daily Forecast
             fcst_data = OrderedDict()
             fcst_data[ATTR_ATTRIBUTION] = ATTRIBUTION
-            fcst_data["temp_high_today"] = temp_high_today
-            fcst_data["temp_low_today"] = temp_low_today
+            fcst_data["temp_high_today"] = self.unit_system.temperature.m_from(temp_high_today)
+            fcst_data["temp_low_today"] = self.unit_system.temperature.m_from(temp_low_today)
 
             for row in forecast_data[FORECAST_TYPE_DAILY]:
                 # Skip over past forecasts - seems the API sometimes returns old forecasts
@@ -136,9 +178,9 @@ class Forecast:
                 wind_bearing = []
                 for hourly in forecast_data["hourly"]:
                     if hourly["local_day"] == row["day_num"]:
-                        precip += hourly["precip"]
-                        wind_avg.append(hourly["wind_avg"])
-                        wind_bearing.append(hourly["wind_direction"])
+                        precip += get(hourly, "precip")
+                        wind_avg.append(get(hourly, "wind_avg"))
+                        wind_bearing.append(get(hourly, "wind_direction"))
                 sum_wind_avg = sum(wind_avg) / len(wind_avg)
                 sum_wind_bearing = sum(wind_bearing) / len(wind_bearing) % 360
 
@@ -147,17 +189,11 @@ class Forecast:
                         row["day_start_local"]
                     ),
                     ATTR_FORECAST_CONDITION: "cloudy" if row.get("icon") is None else self.ha_condition_value(row["icon"]),
-                    ATTR_FORECAST_TEMP: self.conversions.temperature(
-                        row["air_temp_high"]
-                    ),
-                    ATTR_FORECAST_TEMP_LOW: self.conversions.temperature(
-                        row["air_temp_low"]
-                    ),
-                    ATTR_FORECAST_PRECIPITATION: self.conversions.rain(precip),
+                    ATTR_FORECAST_TEMP: self.unit_system.temperature.m_from(get(row, "air_temp_high")),
+                    ATTR_FORECAST_TEMP_LOW: self.unit_system.temperature.m_from(get(row, "air_temp_low")),
+                    ATTR_FORECAST_PRECIPITATION: self.unit_system.rain.m_from(precip),
                     ATTR_FORECAST_PRECIPITATION_PROBABILITY: row["precip_probability"],
-                    ATTR_FORECAST_WIND_SPEED: self.conversions.speed(
-                        sum_wind_avg, True
-                    ),
+                    ATTR_FORECAST_WIND_SPEED: self.unit_system.forecast_wind_speed.m_from(sum_wind_avg),
                     ATTR_FORECAST_WIND_BEARING: int(sum_wind_bearing),
                     # "conditions": row["conditions"],
                     # "precip_icon": row.get("precip_icon", ""),
@@ -182,22 +218,16 @@ class Forecast:
                         row["time"]
                     ),
                     ATTR_FORECAST_CONDITION: self.ha_condition_value(row.get("icon")),
-                    ATTR_FORECAST_TEMP: self.conversions.temperature(
-                        row["air_temperature"]
-                    ),
-                    ATTR_FORECAST_PRESSURE: self.conversions.pressure(
-                        row.get("sea_level_pressure", 0)
-                    ),
+                    ATTR_FORECAST_TEMP: self.unit_system.temperature.m_from(get(row, "air_temperature")),
+                    ATTR_FORECAST_PRESSURE: self.unit_system.pressure.m_from(get(row, "sea_level_pressure", 0)),
                     ATTR_FORECAST_HUMIDITY: row["relative_humidity"],
-                    ATTR_FORECAST_PRECIPITATION: self.conversions.rain(row["precip"]),
+                    ATTR_FORECAST_PRECIPITATION: self.unit_system.rain.m_from(get(row, "precip")),
                     ATTR_FORECAST_PRECIPITATION_PROBABILITY: row["precip_probability"],
-                    ATTR_FORECAST_WIND_SPEED: self.conversions.speed(
-                        row["wind_avg"], True
-                    ),
-                    ATTR_FORECAST_WIND_GUST_SPEED: self.conversions.speed(row["wind_gust"], True),
+                    ATTR_FORECAST_WIND_SPEED: self.unit_system.forecast_wind_speed.m_from(get(row, "wind_avg")),
+                    ATTR_FORECAST_WIND_GUST_SPEED: self.unit_system.forecast_wind_speed.m_from(get(row, "wind_gust")),
                     ATTR_FORECAST_WIND_BEARING: row["wind_direction"],
                     ATTR_FORECAST_UV_INDEX: row.get("uv", 0),
-                    ATTR_FORECAST_APPARENT_TEMP: self.conversions.temperature(row["feels_like"]),
+                    ATTR_FORECAST_APPARENT_TEMP: self.unit_system.temperature.m_from(get(row, "feels_like")),
                     # "conditions": row["conditions"],
                     # "precip_icon": row.get("precip_icon", ""),
                     # "precip_type": row.get("precip_type", ""),
@@ -218,7 +248,7 @@ class Forecast:
         _LOGGER.warning("Forecast Server was unresponsive. Skipping forecast update")
         return None, None
 
-    async def async_request(self, method: str, endpoint: str) -> dict[str, Any]:
+    async def async_request(self, method: str, endpoint: str) -> Optional[dict[str, Any]]:
         """Request data from the WeatherFlow API."""
         use_running_session = self._session and not self._session.closed
 
