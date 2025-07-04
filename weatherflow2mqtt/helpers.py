@@ -18,6 +18,7 @@ from .const import (
     EXTERNAL_DIRECTORY,
     SUPPORTED_LANGUAGES,
     UNITS_IMPERIAL,
+    UNITS_METRIC,
     UnitSystem,
 )
 
@@ -962,8 +963,8 @@ class ConversionFunctions:
             cloudy = False
             part_cloud = False
         else:
-            si_p = round(((solar_rad) / (solar_ins))) * 100
-            si_d = round((solar_ins) - (solar_rad))
+            si_p = units.percent.m_from(solar_rad / solar_ins)
+            si_d = UNITS_METRIC.solar_radiation.m_from(solar_ins - solar_rad)
             if ((si_p <= 50) and (si_d >= 50)):
                  cloudy = True
                  part_cloud = False
@@ -997,9 +998,9 @@ class ConversionFunctions:
             current = "fog"
         elif ((snow_prob >= 50) and (cloudy)):
             current = "snowy"
-        elif (cloudy == 'true'):
+        elif cloudy:
             current = "cloudy"
-        elif (part_cloud):
+        elif part_cloud:
             current = "partlycloudy"
         elif (solar_el >= 0 ): # if daytime
             current = "sunny"

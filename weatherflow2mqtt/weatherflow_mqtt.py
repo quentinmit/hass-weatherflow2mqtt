@@ -441,7 +441,7 @@ class WeatherFlowMqtt:
                 event_data[sensor.event][sensor.id] = attr
                 _LOGGER.debug("Setting payload: %s = %s", sensor.id, attr)
             except Exception as ex:
-                _LOGGER.error("Error setting sensor data for %s: %s", sensor.id, ex)
+                _LOGGER.exception("Error setting sensor data for %s: %s", sensor.id, ex)
 
         data = event_data[EVENT_OBSERVATION]
 
