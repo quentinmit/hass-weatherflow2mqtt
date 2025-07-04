@@ -369,9 +369,7 @@ class WeatherFlowMqtt:
 
                     if (fn := sensor.custom_fn) is not None:
                         # TODO: Handle unique data points more elegantly
-                        if sensor.id == "feelslike":
-                            attr = fn(self.cnv, device, self.wind_speed)
-                        elif sensor.id in ("visibility"):
+                        if sensor.id in ("visibility"):
                             attr = fn(self.cnv, device, self.elevation)
                         elif sensor.id == "wbgt":
                             attr = fn(self.cnv, device, self.solar_radiation)

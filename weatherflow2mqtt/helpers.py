@@ -201,18 +201,22 @@ class ConversionFunctions:
 
         return self.translations["rain_intensity"][intensity]
 
-    def feels_like(self, temperature, humidity, windspeed):
-        """ Calculate feel like temperature."""
+    def apparent_temperature(self, temperature, humidity, windspeed):
+        """ Calculate Australian apparent temperature."""
         if temperature is None or humidity is None or windspeed is None:
-            return 0
+            return None
 
-        windspeed = windspeed.to(units.m/units.s).m
-
+        # http://www.bom.gov.au/info/thermal_stress/#atapproximation
         e_value = (
-            humidity * 0.06105 * math.exp((17.27 * temperature) / (237.7 + temperature))
+            humidity * 6.105 * math.exp((17.27 * units.degC.m_from(temperature)) / (237.7 + units.degC.m_from(temperature)))
         )
-        feelslike_c = temperature + 0.348 * e_value - 0.7 * windspeed - 4.25
-        return self.temperature(feelslike_c)
+        at = (
+            temperature
+            + (0.348 * units.delta_degC) * e_value
+            - (0.7 * units("delta_degC / (m / s)")) * windspeed
+            - 4.25 * units.delta_degC
+        )
+        return at
 
     def visibility(self, elevation, temp, dewpoint):
         """ Return the visibility.

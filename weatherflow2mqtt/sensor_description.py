@@ -270,13 +270,25 @@ DEVICE_SENSORS: tuple[BaseSensorDescription, ...] = (
         device_class=DEVICE_CLASS_TEMPERATURE,
         state_class=STATE_CLASS_MEASUREMENT,
         event=EVENT_OBSERVATION,
-        attr="air_temperature",
+        attr="feels_like_temperature",
         decimals=(1, 1),
-        custom_fn=lambda cnv, device, wind_speed: None
-        if wind_speed is None
-        or None in (device.air_temperature, device.relative_humidity)
-        else cnv.feels_like(
-            device.air_temperature.m, device.relative_humidity.m, wind_speed
+    ),
+    SensorDescription(
+        id="apparent_temperature",
+        name="Apparent Temperature",
+        unit_m=TEMP_CELSIUS,
+        unit_i=TEMP_FAHRENHEIT,
+        device_class=DEVICE_CLASS_TEMPERATURE,
+        state_class=STATE_CLASS_MEASUREMENT,
+        event=EVENT_OBSERVATION,
+        attr="air_temperature",
+        decimals=(1,1),
+        custom_fn=lambda cnv, device:
+        None if None in (device.air_temperature, device.relative_humidity, device.wind_speed)
+        else cnv.apparent_temperature(
+            device.air_temperature,
+            device.relative_humidity,
+            device.wind_speed,
         ),
     ),
     SensorDescription(
