@@ -524,7 +524,7 @@ class WeatherFlowMqtt:
         data = OrderedDict()
         data["lightning_strike_distance"] = self.storage["last_lightning_distance"]
         data["lightning_strike_energy"] = self.storage["last_lightning_energy"]
-        data["lightning_strike_time"] = self.storage["last_lightning_time"]
+        data["lightning_strike_time"] = self.cnv.utc_from_timestamp(self.storage["last_lightning_time"])
         self._publish_state(device, EVENT_STRIKE, data)
 
 
